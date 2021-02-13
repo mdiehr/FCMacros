@@ -1,0 +1,16 @@
+# -*- coding: utf-8 -*-
+import FreeCAD
+
+# Find the selected objects
+if FreeCADGui.Selection.getSelection():
+    for obj in FreeCADGui.Selection.getSelection():
+        # If the objects can revolve:
+        if obj.Angle:
+            # Toggle between half and full rotation
+            if obj.Angle == 360.00:
+                obj.Angle = -180.000
+            elif obj.Angle == -180.00:
+                obj.Angle = 180.000
+            else:
+                obj.Angle = 360.00
+# All done! Enjoy your slices
