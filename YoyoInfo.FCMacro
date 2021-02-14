@@ -44,13 +44,14 @@ class YoyoPartData:
 
     def addPart(self, part):
         App.Console.PrintMessage(part.Label + " ("+part.FullName+")\n")
-        partDensity = 1.0
+        partDensity = 0.0
         try:
             labelParts = part.Label.split()
             labelDensity = labelParts[len(labelParts)-1]
             partDensity = float(labelDensity)
         except:
-            App.Console.PrintMessage("Exception " + str(e) + ": Couldn't read density from: '"+part.Label+"'\n")
+            App.Console.PrintMessage("Couldn't read density from: '"+part.Label+"', skipping this part\n")
+            return
 
         partVolume = part.Shape.Volume
         partMass = partVolume * partDensity / 1000.0
@@ -97,9 +98,10 @@ class YoyoPartData:
         self.yoyoInertiaY3 += mmoiY3
         self.yoyoInertiaZ3 += mmoiZ3
 
-# Filter to say if the part is revolutionary
+# Filter to say if the part type should be included in the calculations
 def isRevolve(part):
-    return part.TypeId == 'Part::Revolution'
+    # App.Console.PrintMessage('Checking part ' + part.TypeId + ' ' + part.Label + ' ' + part.FullName + '\n')
+    return part.TypeId == 'Part::Revolution' or part.TypeId == 'Part::Cut'
 
 # Toggles the first object in the list, then uses its new angle to set all the rest
 def processList(yoyo, objList):
