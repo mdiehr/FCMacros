@@ -1,0 +1,119 @@
+# -*- coding: utf-8 -*-
+
+# Macro by Mark1D
+# Calculates mass & moment of inertia for selected parts or all parts in the document
+
+import FreeCAD
+
+class YoyoPartData:
+    yoyoMass = 0.0
+
+    yoyoInertiaX1 = 0.0
+    yoyoInertiaY1 = 0.0
+    yoyoInertiaZ1 = 0.0
+    yoyoInertiaX2 = 0.0
+    yoyoInertiaY2 = 0.0
+    yoyoInertiaZ2 = 0.0
+    yoyoInertiaX3 = 0.0
+    yoyoInertiaY3 = 0.0
+    yoyoInertiaZ3 = 0.0
+
+    unitMass = 1.00 # gram
+    unitLength = 1.00 # mm
+    unitVolume = 1.00 # mm3
+
+    massOfBearingPadsAxle = 2.80 # g
+
+    formatString = "{:10.2f}"
+
+    def printData(self):
+        assembledMass = self.yoyoMass * 2 + self.massOfBearingPadsAxle
+        App.Console.PrintMessage("\n============ ASSEMBLED YOYO ============\n"
+                                +"     Half:" + self.formatString.format(self.yoyoMass)+" g\n"
+                                +"Assembled:" + self.formatString.format(assembledMass)+" g\n"
+                                +"     MMoI:" + self.formatString.format(self.yoyoInertiaX1)  +","
+                                    + self.formatString.format(self.yoyoInertiaY1)  +","
+                                    + self.formatString.format(self.yoyoInertiaZ1)  +"\n"
+                                +"          " + self.formatString.format(self.yoyoInertiaX2)  +","
+                                    + self.formatString.format(self.yoyoInertiaY2)  +","
+                                    + self.formatString.format(self.yoyoInertiaZ2)  +"\n"
+                                +"          " + self.formatString.format(self.yoyoInertiaX3)  +","
+                                    + self.formatString.format(self.yoyoInertiaY3)  +","
+                                    + self.formatString.format(self.yoyoInertiaZ3)  +"\n"
+            )
+
+    def addPart(self, part):
+        App.Console.PrintMessage(part.Label + " ("+part.FullName+")\n")
+        partDensity = 1.0
+        try:
+            labelParts = part.Label.split()
+            labelDensity = labelParts[len(labelParts)-1]
+            partDensity = float(labelDensity)
+        except:
+            App.Console.PrintMessage("Exception " + str(e) + ": Couldn't read density from: '"+part.Label+"'\n")
+
+        partVolume = part.Shape.Volume
+        partMass = partVolume * partDensity / 1000.0
+        self.yoyoMass = self.yoyoMass + partMass
+
+        App.Console.PrintMessage("\tDensity: "+self.formatString.format(partDensity)+"\n")
+        App.Console.PrintMessage("\tMass:    "+self.formatString.format(partMass)+" g\n")
+
+        self.addMOI(part, partDensity)
+
+    def addMOI(self, part, partDensity):
+        m = part.Shape.Solids[0].MatrixOfInertia
+        MatrixX1 = (m.A[0])
+        MatrixY1 = (m.A[1])
+        MatrixZ1 = (m.A[2])
+
+        MatrixX2 = (m.A[4])
+        MatrixY2 = (m.A[5])
+        MatrixZ2 = (m.A[6])
+
+        MatrixX3 = (m.A[8])
+        MatrixY3 = (m.A[9])
+        MatrixZ3 = (m.A[10])
+
+        multiplicand = self.unitLength**5 * partDensity * self.unitMass * (1.0 / (self.unitVolume * 1000.0));
+
+        mmoiX1 = (MatrixX1 * multiplicand)
+        mmoiY1 = (MatrixY1 * multiplicand)
+        mmoiZ1 = (MatrixZ1 * multiplicand)
+        mmoiX2 = (MatrixX2 * multiplicand)
+        mmoiY2 = (MatrixY2 * multiplicand)
+        mmoiZ2 = (MatrixZ2 * multiplicand)
+        mmoiX3 = (MatrixX3 * multiplicand)
+        mmoiY3 = (MatrixY3 * multiplicand)
+        mmoiZ3 = (MatrixZ3 * multiplicand)
+
+        self.yoyoInertiaX1 += mmoiX1
+        self.yoyoInertiaY1 += mmoiY1
+        self.yoyoInertiaZ1 += mmoiZ1
+        self.yoyoInertiaX2 += mmoiX2
+        self.yoyoInertiaY2 += mmoiY2
+        self.yoyoInertiaZ2 += mmoiZ2
+        self.yoyoInertiaX3 += mmoiX3
+        self.yoyoInertiaY3 += mmoiY3
+        self.yoyoInertiaZ3 += mmoiZ3
+
+# Filter to say if the part is revolutionary
+def isRevolve(part):
+    return part.TypeId == 'Part::Revolution'
+
+# Toggles the first object in the list, then uses its new angle to set all the rest
+def processList(yoyo, objList):
+    for obj in filter(isRevolve, objList):
+        yoyo.addPart(obj)
+        # calculateData(obj)
+    yoyo.printData()
+
+yoyoPart = YoyoPartData()
+
+# Runs for a selection or for all objects
+if FreeCADGui.Selection.getSelection():
+    App.Console.PrintMessage('\n\n============ YOYO STATS FOR SELECTED PARTS ============\n')
+    processList(yoyoPart, FreeCADGui.Selection.getSelection())
+else:
+    App.Console.PrintMessage('\n\n============ YOYO STATS FOR ALL PARTS ============\n')
+    processList(yoyoPart, App.ActiveDocument.Objects)
