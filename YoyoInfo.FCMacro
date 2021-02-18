@@ -99,23 +99,31 @@ class YoyoPartData:
         self.yoyoInertiaZ3 += mmoiZ3
 
 # Filter to say if the part type should be included in the calculations
-def isRevolve(part):
-    # App.Console.PrintMessage('Checking part ' + part.TypeId + ' ' + part.Label + ' ' + part.FullName + '\n')
-    return part.TypeId == 'Part::Revolution' or part.TypeId == 'Part::Cut'
+def isPartSolid(part):
+    if "Part::" in part.TypeId or "PartDesign::" in part.TypeId:
+        # App.Console.PrintMessage('Checking part ' + part.TypeId + ' ' + part.Label + ' ' + part.FullName + '\n')
+        if part.Shape:
+            if part.Shape.Volume:
+                return part.Shape.Volume > 0
+    return False;
 
 # Toggles the first object in the list, then uses its new angle to set all the rest
 def processList(yoyo, objList):
-    for obj in filter(isRevolve, objList):
+    for obj in filter(isPartSolid, objList):
         yoyo.addPart(obj)
-        # calculateData(obj)
     yoyo.printData()
 
-yoyoPart = YoyoPartData()
+def runMacro():
+    # Instance of the class object
+    yoyoPart = YoyoPartData()
 
-# Runs for a selection or for all objects
-if FreeCADGui.Selection.getSelection():
-    App.Console.PrintMessage('\n\n============ YOYO STATS FOR SELECTED PARTS ============\n')
-    processList(yoyoPart, FreeCADGui.Selection.getSelection())
-else:
-    App.Console.PrintMessage('\n\n============ YOYO STATS FOR ALL PARTS ============\n')
-    processList(yoyoPart, App.ActiveDocument.Objects)
+    # Runs for a selection or for all objects
+    if FreeCADGui.Selection.getSelection():
+        App.Console.PrintMessage('\n\n============ YOYO STATS FOR SELECTED PARTS ============\n')
+        processList(yoyoPart, FreeCADGui.Selection.getSelection())
+    else:
+        App.Console.PrintMessage('\n\n============ YOYO STATS FOR ALL PARTS ============\n')
+        processList(yoyoPart, App.ActiveDocument.Objects)
+
+# Let's go!
+runMacro()
