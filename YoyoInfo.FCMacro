@@ -22,7 +22,18 @@ class YoyoPartData:
     unitLength = 1.00 # mm
     unitVolume = 1.00 # mm3
 
-    massOfBearingPadsAxle = 2.80 # g
+    massOfPads = 0.30
+    massOfBearing = 2.10
+    massOfSEUltraLites = 2.50
+    massOfSELego = 2.73
+    massOfSESpikes = 3.20
+    massOfSEBrassMarkmonts = 6.68
+    massOfTopyoBearingAxle = 2.50
+    massOfM85BearingAxle = 1.00
+    # massOfBearingPadsAxle = massOfPads + massOfBearing + massOfSEUltraLites
+    # massOfBearingPadsAxle = massOfPads + massOfBearing + massOfSESpikes
+    massOfBearingPadsAxle = massOfPads + massOfTopyoBearingAxle
+    # massOfBearingPadsAxle = massOfPads + massOfM85BearingAxle
 
     formatString = "{:10.2f}"
 
@@ -107,7 +118,7 @@ def isPartSolid(part):
                 return part.Shape.Volume > 0
     return False;
 
-# Toggles the first object in the list, then uses its new angle to set all the rest
+# Looks at all the objects in the document
 def processList(yoyo, objList):
     for obj in filter(isPartSolid, objList):
         yoyo.addPart(obj)
