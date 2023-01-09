@@ -1,9 +1,184 @@
-# -*- coding: utf-8 -*-
+#!/usr/bin/env python
+# coding: utf-8
 
 # Macro by Mark1D
 # Calculates mass & moment of inertia for selected parts or all parts in the document
 
+__Name__ = 'YoyoInfo'
+__Comment__ = 'Yoyo stuff for making yoyos'
+__Author__ = 'Mark1D'
+__Version__ = '3.0.1'
+
 import FreeCAD
+import FreeCAD as app
+import FreeCADGui as gui
+from FreeCAD import Units
+
+from PySide import QtGui, QtCore
+from PySide.QtGui import QApplication, QDialog, QMainWindow
+
+
+# Preferences
+
+# FreeCAD: Tools -> Edit Parameters, 2nd parameter of .GetX sets the default
+MACRO_SETTINGS  = 'User parameter:BaseApp/Preferences/Macros/' + __Name__
+
+
+GUI_FONT_SIZE = app.ParamGet('User parameter:BaseApp/Preferences/Editor').GetInt('FontSize', 10)
+GUI_ICON_SIZE = app.ParamGet('User parameter:BaseApp/Preferences/General').GetInt('ToolbarIconSize', 24)
+
+
+
+g_main_window = gui.getMainWindow()
+g_font = g_main_window.font()
+g_font.setPointSize(GUI_FONT_SIZE)
+g_font_metrics = QtGui.QFontMetrics(g_font)
+g_str_width = g_font_metrics.horizontalAdvance('_0_000e+00_')
+g_icon_size = QtCore.QSize(GUI_ICON_SIZE, GUI_ICON_SIZE)
+g_sel_user = []    # the user list of selected objects
+g_sel = []    # the valid list of selected objects
+
+
+class YoyoDock(QtGui.QDockWidget):
+
+    def __init__(self):
+        super().__init__()
+        self.setAttribute(QtCore.Qt.WA_DeleteOnClose, True)    # free memory
+        self.setLocale(QtCore.QLocale.English)
+        self.child = YoyoWidget(self)
+        self.setWidget(self.child)
+        g_main_window.addDockWidget(QtCore.Qt.RightDockWidgetArea, self)
+
+
+
+class YoyoWidget(QtGui.QWidget):
+    """This is the widget which does almost all of the work.
+    Widgets don't have close boxes, so closing is dealt with in
+    CenterofmassWindow.
+    """
+    def __init__(self, parent):
+        super().__init__(parent)
+        self.setObjectName(__Name__)
+        parent.setWindowTitle(__Name__ + ' ' + __Version__)
+        parent.setFont(g_font)
+        self.doc = app.activeDocument()
+        self.init_UI()
+        self.on_push_button_recalculate()
+
+    def init_UI(self):
+        """Lay out the interactive elements"""
+        layout = QtGui.QVBoxLayout(self)
+
+        # Recalculate button
+        button_recalculate = QtGui.QPushButton('Recalculate')
+        button_recalculate.setToolTip('Recalculate Yoyo MMOI')
+        button_recalculate.setIcon(QtGui.QIcon(':/icons/view-refresh.svg'))
+        button_recalculate.setIconSize(g_icon_size)
+        button_recalculate.clicked.connect(self.on_push_button_recalculate)
+
+        # Parts dropdown
+        self.create_parts_dropdown()
+
+        # Calculated totals
+
+        label_mass = QtGui.QLabel('Mass')
+        self.resultMass = self.create_label_line('assembled mass')
+        label_half = QtGui.QLabel('Half Mass')
+        self.resultHalf = self.create_label_line('half mass')
+        label_mmoi = QtGui.QLabel('MMOI')
+        self.resultMMOI = self.create_label_line('MMOI')
+
+        layout_total = QtGui.QGridLayout()
+
+        layout_total.addWidget(label_mass, 0, 0)
+        layout_total.addWidget(self.resultMass, 0, 2)
+
+        layout_total.addWidget(label_half, 1, 0)
+        layout_total.addWidget(self.resultHalf, 1, 2)
+
+        layout_total.addWidget(label_mmoi, 2, 0)
+        layout_total.addWidget(self.resultMMOI, 2, 2)
+
+        self.box_totals = QtGui.QGroupBox(self.doc.Name)
+        self.box_totals.setLayout(layout_total)
+
+        layout.addWidget(self.box_totals)
+        layout.addWidget(button_recalculate)
+        layout.addWidget(self.combo_parts)
+        layout.addStretch()
+
+
+        qApp = QtGui.QApplication.instance()
+        qApp.focusChanged.connect(self.on_focusChanged)    # emits on each focus change in FreeCAD
+
+    def create_parts_dropdown(self):
+        massOfPads = 0.30
+        massOfBearing = 2.10
+        massOfSEUltraLites = 2.50
+        massOfSELego = 2.73
+        massOfSESpikes = 3.20
+        massOfSEBrassMarkmonts = 6.68
+        massOfTopyoBearingAxle = 2.50
+        massOfM85BearingAxle = 1.00
+
+        self.parts_dict = {
+            'C Bearing': massOfPads + massOfTopyoBearingAxle,
+            'MR85 Bearing': massOfPads + massOfM85BearingAxle,
+            'Side Effect - Ultra Lights': massOfPads + massOfBearing + massOfSEUltraLites,
+            'Side Effect - Legos': massOfPads + massOfBearing + massOfSELego,
+            'Side Effect - Spikes': massOfPads + massOfBearing + massOfSESpikes,
+        }
+        self.parts_mass = self.parts_dict.get('C Bearing')
+        self.combo_parts = QtGui.QComboBox(toolTip='Select the parts for the bearing/pads')
+        for key in self.parts_dict:
+            self.combo_parts.addItem(key)
+        self.combo_parts.currentIndexChanged.connect(self.on_parts_dropdown_changed)
+        return self.combo_parts
+
+    def on_parts_dropdown_changed(self, new_index):
+        curr_text = self.combo_parts.currentText()
+        self.parts_mass = self.parts_dict.get(curr_text)
+
+    def create_label_line(self, name):
+        line = QtGui.QLineEdit(self)
+        line.setObjectName(name)
+        line.setReadOnly(True)
+        return line
+
+    def on_focusChanged(self):
+        # self.box_totals.setTitle(self.doc.Name)
+        pass
+
+
+    def on_push_button_recalculate(self):
+        # Set doc name
+        self.doc = app.activeDocument()
+        self.box_totals.setTitle(self.doc.Name)
+
+        # Instance of the class object
+        yoyoPart = YoyoPartData()
+
+        # Runs for a selection or for all objects
+        if FreeCADGui.Selection.getSelection():
+            self.processList(yoyoPart, FreeCADGui.Selection.getSelection())
+        else:
+            self.processList(yoyoPart, App.ActiveDocument.Objects)
+
+        # Outputs
+        parts = self.parts_mass
+        assembledMass = yoyoPart.yoyoMass * 2 + self.parts_mass
+        self.resultHalf.setText('{:.6} g'.format(yoyoPart.yoyoMass))
+        self.resultMass.setText('{:.6} g'.format(assembledMass))
+        self.resultMMOI.setText('{:.6}'.format(yoyoPart.yoyoInertiaX1))
+        pass
+
+
+    # Looks at all the objects in the document
+    def processList(self, yoyo, objList):
+        for obj in filter(isPartSolid, objList):
+            yoyo.addPart(obj)
+
+
 
 class YoyoPartData:
     yoyoMass = 0.0
@@ -34,6 +209,7 @@ class YoyoPartData:
     # massOfBearingPadsAxle = massOfPads + massOfBearing + massOfSESpikes
     massOfBearingPadsAxle = massOfPads + massOfTopyoBearingAxle
     # massOfBearingPadsAxle = massOfPads + massOfM85BearingAxle
+    # massOfBearingPadsAxle = 0.9
 
     formatString = "{:10.2f}"
 
@@ -109,6 +285,7 @@ class YoyoPartData:
         self.yoyoInertiaY3 += mmoiY3
         self.yoyoInertiaZ3 += mmoiZ3
 
+
 # Filter to say if the part type should be included in the calculations
 def isPartSolid(part):
     if "Part::" in part.TypeId or "PartDesign::" in part.TypeId:
@@ -118,23 +295,14 @@ def isPartSolid(part):
                 return part.Shape.Volume > 0
     return False;
 
-# Looks at all the objects in the document
-def processList(yoyo, objList):
-    for obj in filter(isPartSolid, objList):
-        yoyo.addPart(obj)
-    yoyo.printData()
+def error_message(msg):
+    app.Console.PrintError(msg + '\n')
+    QtGui.QMessageBox.critical(g_main_window, 'Error', msg)
 
-def runMacro():
-    # Instance of the class object
-    yoyoPart = YoyoPartData()
-
-    # Runs for a selection or for all objects
-    if FreeCADGui.Selection.getSelection():
-        App.Console.PrintMessage('\n\n============ YOYO STATS FOR SELECTED PARTS ============\n')
-        processList(yoyoPart, FreeCADGui.Selection.getSelection())
+if __name__ == '__main__':
+    if not app.activeDocument():
+        error_message('Open a document first.')
     else:
-        App.Console.PrintMessage('\n\n============ YOYO STATS FOR ALL PARTS ============\n')
-        processList(yoyoPart, App.ActiveDocument.Objects)
-
-# Let's go!
-runMacro()
+        print('Loading ' + __Name__ + ' ' + __Version__ + ' ...')
+        gui.updateGui()
+        myWidget = YoyoDock()
