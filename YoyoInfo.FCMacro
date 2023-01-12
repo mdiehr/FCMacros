@@ -61,13 +61,14 @@ class YoyoWidget(QtGui.QWidget):
         self.setObjectName(__Name__)
         parent.setWindowTitle(__Name__ + ' ' + __Version__)
         parent.setFont(g_font)
+        self.part_widgets = []
         self.doc = app.activeDocument()
         self.init_UI()
         self.on_push_button_recalculate()
 
     def init_UI(self):
         """Lay out the interactive elements"""
-        layout = QtGui.QVBoxLayout(self)
+        self.layout = QtGui.QVBoxLayout(self)
 
         # Recalculate button
         button_recalculate = QtGui.QPushButton('Recalculate')
@@ -80,13 +81,12 @@ class YoyoWidget(QtGui.QWidget):
         self.create_parts_dropdown()
 
         # Calculated totals
-
         label_mass = QtGui.QLabel('Mass')
-        self.resultMass = self.create_label_line('assembled mass')
+        self.resultMass = create_label_line(self, 'mass')
         label_half = QtGui.QLabel('Half Mass')
-        self.resultHalf = self.create_label_line('half mass')
+        self.resultHalf = create_label_line(self, 'half mass')
         label_mmoi = QtGui.QLabel('MMOI')
-        self.resultMMOI = self.create_label_line('MMOI')
+        self.resultMMOI = create_label_line(self, 'MMOI')
 
         layout_total = QtGui.QGridLayout()
 
@@ -102,14 +102,25 @@ class YoyoWidget(QtGui.QWidget):
         self.box_totals = QtGui.QGroupBox(self.doc.Name)
         self.box_totals.setLayout(layout_total)
 
-        layout.addWidget(self.box_totals)
-        layout.addWidget(button_recalculate)
-        layout.addWidget(self.combo_parts)
-        layout.addStretch()
+        # Yoyo parts
+        self.partsLayout = QtGui.QGridLayout()
 
+        # Headings
+        self.partsLayout.addWidget(QtGui.QLabel('Label'), 0, 0)
+        self.partsLayout.addWidget(QtGui.QLabel('Mass'), 0, 1)
+        self.partsLayout.addWidget(QtGui.QLabel('MMOI'), 0, 2)
 
-        qApp = QtGui.QApplication.instance()
-        qApp.focusChanged.connect(self.on_focusChanged)    # emits on each focus change in FreeCAD
+        self.box_parts = QtGui.QGroupBox()
+        self.box_parts.setTitle('Parts')
+        self.box_parts.setFlat(True)
+        self.box_parts.setLayout(self.partsLayout)
+
+        self.layout.addWidget(self.box_totals)
+        self.layout.addWidget(button_recalculate)
+        self.layout.addWidget(self.combo_parts)
+        self.layout.addWidget(self.box_parts)
+        self.layout.addStretch()
+        pass
 
     def create_parts_dropdown(self):
         massOfPads = 0.30
@@ -139,49 +150,70 @@ class YoyoWidget(QtGui.QWidget):
         curr_text = self.combo_parts.currentText()
         self.parts_mass = self.parts_dict.get(curr_text)
 
-    def create_label_line(self, name):
-        line = QtGui.QLineEdit(self)
-        line.setObjectName(name)
-        line.setReadOnly(True)
-        return line
-
-    def on_focusChanged(self):
-        # self.box_totals.setTitle(self.doc.Name)
-        pass
-
-
     def on_push_button_recalculate(self):
         # Set doc name
         self.doc = app.activeDocument()
         self.box_totals.setTitle(self.doc.Name)
 
         # Instance of the class object
-        yoyoPart = YoyoPartData()
+        yoyoAssembly = YoyoPartData()
+        yoyoAssembly.parts = []
 
         # Runs for a selection or for all objects
         if FreeCADGui.Selection.getSelection():
-            self.processList(yoyoPart, FreeCADGui.Selection.getSelection())
+            self.processList(yoyoAssembly, FreeCADGui.Selection.getSelection())
         else:
-            self.processList(yoyoPart, App.ActiveDocument.Objects)
+            self.processList(yoyoAssembly, App.ActiveDocument.Objects)
 
         # Outputs
-        parts = self.parts_mass
-        assembledMass = yoyoPart.yoyoMass * 2 + self.parts_mass
-        self.resultHalf.setText('{:.6} g'.format(yoyoPart.yoyoMass))
+        assembledMass = yoyoAssembly.yoyoMass * 2 + self.parts_mass
+        self.resultHalf.setText('{:.6} g'.format(yoyoAssembly.yoyoMass))
         self.resultMass.setText('{:.6} g'.format(assembledMass))
-        self.resultMMOI.setText('{:.6}'.format(yoyoPart.yoyoInertiaX1))
+        self.resultMMOI.setText('{:.6}'.format(yoyoAssembly.yoyoInertiaX1))
+
+        # Parts list
+        if len(self.part_widgets) > 0:
+            self.clear_parts_layout()
+        index = 1
+        for part in yoyoAssembly.parts:
+            self.part_widgets.append(PartWidget(parent=self, part=part, index=index))
+            index = index + 1
         pass
 
+    def clear_parts_layout(self):
+        for part in self.part_widgets:
+            part.cleanup()
+            del part
+        self.part_widgets = []
+        pass
 
     # Looks at all the objects in the document
     def processList(self, yoyo, objList):
         for obj in filter(isPartSolid, objList):
             yoyo.addPart(obj)
 
+class PartWidget():
+    """Rows in parts area"""
+    def __init__(self, *, parent, part, index):
+        self.parent = parent
+        self.part = part
+        self.result01 = QtGui.QLabel(part['label'])
+        self.result02 = QtGui.QLabel('{:10.4} g'.format(part['mass']))
+        self.result03 = QtGui.QLabel('{:10.6}'.format(part['mmoi']))
 
+        self.parent.partsLayout.addWidget(self.result01, index, 0)
+        self.parent.partsLayout.addWidget(self.result02, index, 1)
+        self.parent.partsLayout.addWidget(self.result03, index, 2)
+
+    def cleanup(self):
+        self.result01.deleteLater()
+        self.result02.deleteLater()
+        self.result03.deleteLater()
 
 class YoyoPartData:
     yoyoMass = 0.0
+
+    parts = []
 
     yoyoInertiaX1 = 0.0
     yoyoInertiaY1 = 0.0
@@ -205,11 +237,7 @@ class YoyoPartData:
     massOfSEBrassMarkmonts = 6.68
     massOfTopyoBearingAxle = 2.50
     massOfM85BearingAxle = 1.00
-    # massOfBearingPadsAxle = massOfPads + massOfBearing + massOfSEUltraLites
-    # massOfBearingPadsAxle = massOfPads + massOfBearing + massOfSESpikes
     massOfBearingPadsAxle = massOfPads + massOfTopyoBearingAxle
-    # massOfBearingPadsAxle = massOfPads + massOfM85BearingAxle
-    # massOfBearingPadsAxle = 0.9
 
     formatString = "{:10.2f}"
 
@@ -230,24 +258,26 @@ class YoyoPartData:
             )
 
     def addPart(self, part):
-        App.Console.PrintMessage(part.Label + " ("+part.FullName+")\n")
+        # App.Console.PrintMessage(part.Label + " ("+part.FullName+")\n")
         partDensity = 0.0
         try:
             labelParts = part.Label.split()
             labelDensity = labelParts[len(labelParts)-1]
             partDensity = float(labelDensity)
         except:
-            App.Console.PrintMessage("Couldn't read density from: '"+part.Label+"', skipping this part\n")
+            # App.Console.PrintMessage("Couldn't read density from: '"+part.Label+"', skipping this part\n")
             return
 
         partVolume = part.Shape.Volume
         partMass = partVolume * partDensity / 1000.0
+        partMMOI = self.addMOI(part, partDensity)
         self.yoyoMass = self.yoyoMass + partMass
+        partData = { 'label': part.Label, 'mass': partMass, 'density': partDensity, 'volume': partVolume, 'mmoi': partMMOI }
+        self.parts.append(partData)
 
-        App.Console.PrintMessage("\tDensity: "+self.formatString.format(partDensity)+"\n")
-        App.Console.PrintMessage("\tMass:    "+self.formatString.format(partMass)+" g\n")
+        # App.Console.PrintMessage("\tDensity: "+self.formatString.format(partDensity)+"\n")
+        # App.Console.PrintMessage("\tMass:    "+self.formatString.format(partMass)+" g\n")
 
-        self.addMOI(part, partDensity)
 
     def addMOI(self, part, partDensity):
         m = part.Shape.Solids[0].MatrixOfInertia
@@ -285,6 +315,15 @@ class YoyoPartData:
         self.yoyoInertiaY3 += mmoiY3
         self.yoyoInertiaZ3 += mmoiZ3
 
+        return mmoiX1
+
+
+# Utility method
+def create_label_line(parent, name):
+    line = QtGui.QLineEdit(parent)
+    line.setObjectName(name)
+    line.setReadOnly(True)
+    return line
 
 # Filter to say if the part type should be included in the calculations
 def isPartSolid(part):
