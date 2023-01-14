@@ -87,6 +87,10 @@ class YoyoWidget(QtGui.QWidget):
         self.resultHalf = create_label_line(self, 'half mass')
         label_mmoi = QtGui.QLabel('MMOI')
         self.resultMMOI = create_label_line(self, 'MMOI')
+        label_width = QtGui.QLabel('Width')
+        self.resultWidth = create_label_line(self, 'Width')
+        label_diameter = QtGui.QLabel('Diameter')
+        self.resultDiameter = create_label_line(self, 'Diameter')
 
         layout_total = QtGui.QGridLayout()
 
@@ -98,6 +102,13 @@ class YoyoWidget(QtGui.QWidget):
 
         layout_total.addWidget(label_mmoi, 2, 0)
         layout_total.addWidget(self.resultMMOI, 2, 2)
+
+        layout_total.addWidget(label_width, 3, 0)
+        layout_total.addWidget(self.resultWidth, 3, 2)
+
+        layout_total.addWidget(label_diameter, 4, 0)
+        layout_total.addWidget(self.resultDiameter, 4, 2)
+
 
         self.box_totals = QtGui.QGroupBox(self.doc.Name)
         self.box_totals.setLayout(layout_total)
@@ -167,9 +178,15 @@ class YoyoWidget(QtGui.QWidget):
 
         # Outputs
         assembledMass = yoyoAssembly.yoyoMass * 2 + self.parts_mass
-        self.resultHalf.setText('{:.6} g'.format(yoyoAssembly.yoyoMass))
-        self.resultMass.setText('{:.6} g'.format(assembledMass))
-        self.resultMMOI.setText('{:.6}'.format(yoyoAssembly.yoyoInertiaX1))
+        self.resultHalf.setText('{:12.6} g'.format(yoyoAssembly.yoyoMass))
+        self.resultMass.setText('{:12.6} g'.format(assembledMass))
+        self.resultMMOI.setText('{:12.6}'.format(yoyoAssembly.yoyoInertiaX1))
+
+        bbox = yoyoAssembly.getBoundingBox()
+        width = bbox[1]-bbox[0]
+        diameter = bbox[3]-bbox[2]
+        self.resultWidth.setText('{:6.4} mm'.format(width))
+        self.resultDiameter.setText('{:6.4} mm'.format(diameter))
 
         # Parts list
         if len(self.part_widgets) > 0:
@@ -213,7 +230,8 @@ class PartWidget():
 class YoyoPartData:
     yoyoMass = 0.0
 
-    parts = []
+    parts = []  # parts with density, stored as convenient dicts of summary info
+    partFeatures = [] # everything
 
     yoyoInertiaX1 = 0.0
     yoyoInertiaY1 = 0.0
@@ -241,6 +259,10 @@ class YoyoPartData:
 
     formatString = "{:10.2f}"
 
+    def __init__(self):
+        self.parts = []
+        self.partFeatures = []
+
     def printData(self):
         assembledMass = self.yoyoMass * 2 + self.massOfBearingPadsAxle
         App.Console.PrintMessage("\n============ ASSEMBLED YOYO ============\n"
@@ -260,6 +282,7 @@ class YoyoPartData:
     def addPart(self, part):
         # App.Console.PrintMessage(part.Label + " ("+part.FullName+")\n")
         partDensity = 0.0
+        self.partFeatures.append(part)
         try:
             labelParts = part.Label.split()
             labelDensity = labelParts[len(labelParts)-1]
@@ -277,6 +300,26 @@ class YoyoPartData:
 
         # App.Console.PrintMessage("\tDensity: "+self.formatString.format(partDensity)+"\n")
         # App.Console.PrintMessage("\tMass:    "+self.formatString.format(partMass)+" g\n")
+
+    def getBoundingBox(self):
+        boxes = [pf.Shape.BoundBox for pf in self.partFeatures]
+
+        XMin = 0;
+        XMax = 0;
+        YMin = 0;
+        YMax = 0;
+        ZMin = 0;
+        ZMax = 0;
+
+        for box in boxes:
+            XMin = min(XMin, box.XMin)
+            XMax = max(XMax, box.XMax)
+            YMin = min(YMin, box.YMin)
+            YMax = max(YMax, box.YMax)
+            ZMin = min(ZMin, box.ZMin)
+            ZMax = max(ZMax, box.ZMax)
+        return (XMin, XMax, YMin, YMax, ZMin, ZMax)
+
 
 
     def addMOI(self, part, partDensity):
