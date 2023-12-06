@@ -7,7 +7,7 @@
 __Name__ = 'YoyoInfo'
 __Comment__ = 'Yoyo stuff for making yoyos'
 __Author__ = 'Mark1D'
-__Version__ = '3.0.1'
+__Version__ = '3.0.2'
 
 import FreeCAD
 import FreeCAD as app
@@ -85,8 +85,10 @@ class YoyoWidget(QtGui.QWidget):
         self.resultMass = create_label_line(self, 'mass')
         label_half = QtGui.QLabel('Half Mass')
         self.resultHalf = create_label_line(self, 'half mass')
-        label_mmoi = QtGui.QLabel('MMOI')
+        label_mmoi = QtGui.QLabel('MMOI Major')
         self.resultMMOI = create_label_line(self, 'MMOI')
+        label_mmoi_minor = QtGui.QLabel('MMOI Minor')
+        self.resultMMOIminor = create_label_line(self, 'MMOIminor')
         label_width = QtGui.QLabel('Width')
         self.resultWidth = create_label_line(self, 'Width')
         label_diameter = QtGui.QLabel('Diameter')
@@ -103,11 +105,14 @@ class YoyoWidget(QtGui.QWidget):
         layout_total.addWidget(label_mmoi, 2, 0)
         layout_total.addWidget(self.resultMMOI, 2, 2)
 
-        layout_total.addWidget(label_width, 3, 0)
-        layout_total.addWidget(self.resultWidth, 3, 2)
+        layout_total.addWidget(label_mmoi_minor, 3, 0)
+        layout_total.addWidget(self.resultMMOIminor, 3, 2)
 
-        layout_total.addWidget(label_diameter, 4, 0)
-        layout_total.addWidget(self.resultDiameter, 4, 2)
+        layout_total.addWidget(label_width, 4, 0)
+        layout_total.addWidget(self.resultWidth, 4, 2)
+
+        layout_total.addWidget(label_diameter, 5, 0)
+        layout_total.addWidget(self.resultDiameter, 5, 2)
 
 
         self.box_totals = QtGui.QGroupBox(self.doc.Name)
@@ -181,6 +186,7 @@ class YoyoWidget(QtGui.QWidget):
         self.resultHalf.setText('{:12.6} g'.format(yoyoAssembly.yoyoMass))
         self.resultMass.setText('{:12.6} g'.format(assembledMass))
         self.resultMMOI.setText('{:12.6}'.format(yoyoAssembly.yoyoInertiaX1))
+        self.resultMMOIminor.setText('{:12.6}'.format(yoyoAssembly.yoyoInertiaY2))
 
         bbox = yoyoAssembly.getBoundingBox()
         width = bbox[1]-bbox[0]
