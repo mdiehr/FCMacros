@@ -7,7 +7,7 @@
 __Name__ = 'YoyoInfo'
 __Comment__ = 'Yoyo stuff for making yoyos'
 __Author__ = 'Mark1D'
-__Version__ = '3.0.3'
+__Version__ = '3.0.4'
 
 import FreeCAD
 import FreeCAD as app
