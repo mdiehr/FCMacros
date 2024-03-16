@@ -189,10 +189,10 @@ class YoyoWidget(QtGui.QWidget):
         self.resultMMOIminor.setText('{:12.6}'.format(yoyoAssembly.yoyoInertiaY2))
 
         bbox = yoyoAssembly.getBoundingBox()
-        width:float = bbox[1]-bbox[0]
-        diameter:float = bbox[3]-bbox[2]
-        self.resultWidth.setText('{:6.4} mm'.format(width))
-        self.resultDiameter.setText('{:6.4} mm'.format(diameter))
+        width:float = float(bbox[1]-bbox[0])
+        diameter:float = float(bbox[3]-bbox[2])
+        self.resultWidth.setText('{:6.4} mm'.format(float(width)))
+        self.resultDiameter.setText('{:6.4} mm'.format(float(diameter)))
 
         # Parts list
         if len(self.part_widgets) > 0:
