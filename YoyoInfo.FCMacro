@@ -7,12 +7,12 @@
 __Name__ = 'YoyoInfo'
 __Comment__ = 'Yoyo stuff for making yoyos'
 __Author__ = 'Mark1D'
-__Version__ = '3.0.4'
+__Version__ = '3.1.0'
 
 import FreeCAD
 import FreeCAD as app
 import FreeCADGui as gui
-from FreeCAD import Units
+from FreeCAD import Units, Matrix
 
 from PySide import QtGui, QtCore
 from PySide.QtGui import QApplication, QDialog, QMainWindow
@@ -185,8 +185,8 @@ class YoyoWidget(QtGui.QWidget):
         assembledMass = yoyoAssembly.yoyoMass * 2 + self.parts_mass
         self.resultHalf.setText('{:12.6} g'.format(yoyoAssembly.yoyoMass))
         self.resultMass.setText('{:12.6} g'.format(assembledMass))
-        self.resultMMOI.setText('{:12.6}'.format(yoyoAssembly.yoyoInertiaX1))
-        self.resultMMOIminor.setText('{:12.6}'.format(yoyoAssembly.yoyoInertiaY2))
+        self.resultMMOI.setText('{:12.6}'.format(yoyoAssembly.mmoiMatrix[0]))
+        self.resultMMOIminor.setText('{:12.6}'.format(yoyoAssembly.mmoiMatrix[1]))
 
         bbox = yoyoAssembly.getBoundingBox()
         width:float = float(bbox[1]-bbox[0])
@@ -239,15 +239,7 @@ class YoyoPartData:
     parts = []  # parts with density, stored as convenient dicts of summary info
     partFeatures = [] # everything
 
-    yoyoInertiaX1 = 0.0
-    yoyoInertiaY1 = 0.0
-    yoyoInertiaZ1 = 0.0
-    yoyoInertiaX2 = 0.0
-    yoyoInertiaY2 = 0.0
-    yoyoInertiaZ2 = 0.0
-    yoyoInertiaX3 = 0.0
-    yoyoInertiaY3 = 0.0
-    yoyoInertiaZ3 = 0.0
+    mmoiMatrix = [0,0,0] # only XX, YY, ZZ
 
     unitMass = 1.00 # gram
     unitLength = 1.00 # mm
@@ -268,22 +260,7 @@ class YoyoPartData:
     def __init__(self):
         self.parts = []
         self.partFeatures = []
-
-    def printData(self):
-        assembledMass = self.yoyoMass * 2 + self.massOfBearingPadsAxle
-        App.Console.PrintMessage("\n============ ASSEMBLED YOYO ============\n"
-                                +"     Half:" + self.formatString.format(self.yoyoMass)+" g\n"
-                                +"Assembled:" + self.formatString.format(assembledMass)+" g\n"
-                                +"     MMoI:" + self.formatString.format(self.yoyoInertiaX1)  +","
-                                    + self.formatString.format(self.yoyoInertiaY1)  +","
-                                    + self.formatString.format(self.yoyoInertiaZ1)  +"\n"
-                                +"          " + self.formatString.format(self.yoyoInertiaX2)  +","
-                                    + self.formatString.format(self.yoyoInertiaY2)  +","
-                                    + self.formatString.format(self.yoyoInertiaZ2)  +"\n"
-                                +"          " + self.formatString.format(self.yoyoInertiaX3)  +","
-                                    + self.formatString.format(self.yoyoInertiaY3)  +","
-                                    + self.formatString.format(self.yoyoInertiaZ3)  +"\n"
-            )
+        self.mmoiMatrix = [0,0,0]
 
     def addPart(self, part):
         # App.Console.PrintMessage(part.Label + " ("+part.FullName+")\n")
@@ -306,6 +283,7 @@ class YoyoPartData:
 
         # App.Console.PrintMessage("\tDensity: "+self.formatString.format(partDensity)+"\n")
         # App.Console.PrintMessage("\tMass:    "+self.formatString.format(partMass)+" g\n")
+        # self.printData();
 
     def getBoundingBox(self):
         boxes = [pf.Shape.BoundBox for pf in self.partFeatures]
@@ -327,44 +305,27 @@ class YoyoPartData:
         return (XMin, XMax, YMin, YMax, ZMin, ZMax)
 
 
-
     def addMOI(self, part, partDensity):
-        m = part.Shape.Solids[0].MatrixOfInertia
-        MatrixX1 = (m.A[0])
-        MatrixY1 = (m.A[1])
-        MatrixZ1 = (m.A[2])
+        myMajor = 0
+        scale = self.unitLength**5 * partDensity * self.unitMass * (1.0 / (self.unitVolume * 1000.0))
+        # A part can have multiple solids
+        for solid in part.Shape.Solids:
+            Icm = solid.MatrixOfInertia
+            cm = solid.CenterOfMass
+            m = solid.Volume * partDensity * self.unitMass / (self.unitVolume * 1000.0)
+            d = abs(cm.x) # assume X axis is axis of rotation
 
-        MatrixX2 = (m.A[4])
-        MatrixY2 = (m.A[5])
-        MatrixZ2 = (m.A[6])
+            # Parallel axis theorem: I = Icm + md^2
+            md2 = m * d**2 
+            # Apply only to y/z axis, since X is primary axis of rotation
+            self.mmoiMatrix[0] += Icm.A[0] * scale
+            self.mmoiMatrix[1] += Icm.A[5] * scale + md2
+            self.mmoiMatrix[2] += Icm.A[10] * scale + md2
+            myMajor += Icm.A[0] * scale
 
-        MatrixX3 = (m.A[8])
-        MatrixY3 = (m.A[9])
-        MatrixZ3 = (m.A[10])
+        return myMajor
 
-        multiplicand = self.unitLength**5 * partDensity * self.unitMass * (1.0 / (self.unitVolume * 1000.0));
 
-        mmoiX1 = (MatrixX1 * multiplicand)
-        mmoiY1 = (MatrixY1 * multiplicand)
-        mmoiZ1 = (MatrixZ1 * multiplicand)
-        mmoiX2 = (MatrixX2 * multiplicand)
-        mmoiY2 = (MatrixY2 * multiplicand)
-        mmoiZ2 = (MatrixZ2 * multiplicand)
-        mmoiX3 = (MatrixX3 * multiplicand)
-        mmoiY3 = (MatrixY3 * multiplicand)
-        mmoiZ3 = (MatrixZ3 * multiplicand)
-
-        self.yoyoInertiaX1 += mmoiX1
-        self.yoyoInertiaY1 += mmoiY1
-        self.yoyoInertiaZ1 += mmoiZ1
-        self.yoyoInertiaX2 += mmoiX2
-        self.yoyoInertiaY2 += mmoiY2
-        self.yoyoInertiaZ2 += mmoiZ2
-        self.yoyoInertiaX3 += mmoiX3
-        self.yoyoInertiaY3 += mmoiY3
-        self.yoyoInertiaZ3 += mmoiZ3
-
-        return mmoiX1
 
 
 # Utility method
