@@ -7,7 +7,7 @@
 __Name__ = 'YoyoInfo'
 __Comment__ = 'Yoyo stuff for making yoyos'
 __Author__ = 'Mark1D'
-__Version__ = '3.1.0'
+__Version__ = '3.2.0'
 
 import FreeCAD
 import FreeCAD as app
@@ -81,37 +81,31 @@ class YoyoWidget(QtGui.QWidget):
         self.create_parts_dropdown()
 
         # Calculated totals
-        label_mass = QtGui.QLabel('Mass')
         self.resultMass = create_label_line(self, 'mass')
-        label_half = QtGui.QLabel('Half Mass')
         self.resultHalf = create_label_line(self, 'half mass')
-        label_mmoi = QtGui.QLabel('MMOI Major')
         self.resultMMOI = create_label_line(self, 'MMOI')
-        label_mmoi_minor = QtGui.QLabel('MMOI Minor')
         self.resultMMOIminor = create_label_line(self, 'MMOIminor')
-        label_width = QtGui.QLabel('Width')
         self.resultWidth = create_label_line(self, 'Width')
-        label_diameter = QtGui.QLabel('Diameter')
         self.resultDiameter = create_label_line(self, 'Diameter')
 
         layout_total = QtGui.QGridLayout()
 
-        layout_total.addWidget(label_mass, 0, 0)
+        layout_total.addWidget(QtGui.QLabel('Mass'), 0, 0)
         layout_total.addWidget(self.resultMass, 0, 2)
 
-        layout_total.addWidget(label_half, 1, 0)
+        layout_total.addWidget(QtGui.QLabel('Half Mass'), 1, 0)
         layout_total.addWidget(self.resultHalf, 1, 2)
 
-        layout_total.addWidget(label_mmoi, 2, 0)
+        layout_total.addWidget(QtGui.QLabel('MMOI Major'), 2, 0)
         layout_total.addWidget(self.resultMMOI, 2, 2)
 
-        layout_total.addWidget(label_mmoi_minor, 3, 0)
+        layout_total.addWidget(QtGui.QLabel('MMOI Minor'), 3, 0)
         layout_total.addWidget(self.resultMMOIminor, 3, 2)
 
-        layout_total.addWidget(label_width, 4, 0)
+        layout_total.addWidget(QtGui.QLabel('Width'), 4, 0)
         layout_total.addWidget(self.resultWidth, 4, 2)
 
-        layout_total.addWidget(label_diameter, 5, 0)
+        layout_total.addWidget(QtGui.QLabel('Diameter'), 5, 0)
         layout_total.addWidget(self.resultDiameter, 5, 2)
 
 
