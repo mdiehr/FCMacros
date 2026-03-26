@@ -87,6 +87,8 @@ class YoyoWidget(QtGui.QWidget):
         self.resultMMOIminor = create_label_line(self, 'MMOIminor')
         self.resultWidth = create_label_line(self, 'Width')
         self.resultDiameter = create_label_line(self, 'Diameter')
+        self.resultCentroidX = create_label_line(self, 'centroidx')
+        self.resultCentroidY = create_label_line(self, 'centroidy')
 
         layout_total = QtGui.QGridLayout()
 
@@ -108,6 +110,10 @@ class YoyoWidget(QtGui.QWidget):
         layout_total.addWidget(QtGui.QLabel('Diameter'), 5, 0)
         layout_total.addWidget(self.resultDiameter, 5, 2)
 
+        layout_total.addWidget(QtGui.QLabel('Centroid (x)'), 6, 0)
+        layout_total.addWidget(self.resultCentroidX, 6, 2)
+        layout_total.addWidget(QtGui.QLabel('Centroid (y)'), 7, 0)
+        layout_total.addWidget(self.resultCentroidY, 7, 2)
 
         self.box_totals = QtGui.QGroupBox(self.doc.Name)
         self.box_totals.setLayout(layout_total)
@@ -177,16 +183,24 @@ class YoyoWidget(QtGui.QWidget):
 
         # Outputs
         assembledMass = yoyoAssembly.yoyoMass * 2 + self.parts_mass
+        mmoi = yoyoAssembly.mmoiMatrix[0]
         self.resultHalf.setText('{:12.6} g'.format(yoyoAssembly.yoyoMass))
         self.resultMass.setText('{:12.6} g'.format(assembledMass))
-        self.resultMMOI.setText('{:12.6}'.format(yoyoAssembly.mmoiMatrix[0]))
+        self.resultMMOI.setText('{:12.6}'.format(mmoi))
         self.resultMMOIminor.setText('{:12.6}'.format(yoyoAssembly.mmoiMatrix[1]))
 
         bbox = yoyoAssembly.getBoundingBox()
         width:float = float(bbox[1]-bbox[0])
+        half_width:float = float(bbox[1]) # used for centroid, bbox[1] is xmax
         diameter:float = float(bbox[3]-bbox[2])
+        radius:float = float(bbox[3])
         self.resultWidth.setText('{:6.4} mm'.format(float(width)))
         self.resultDiameter.setText('{:6.4} mm'.format(float(diameter)))
+
+        percentWeightToWidth:float = float(100 * yoyoAssembly.centroid / half_width)
+        percentWeightToRadius:float = 100.0 * mmoi / (yoyoAssembly.yoyoMass * radius * radius)
+        self.resultCentroidX.setText('{:6.4} %'.format(percentWeightToWidth))
+        self.resultCentroidY.setText('{:6.4} %'.format(float(percentWeightToRadius)))
 
         # Parts list
         if len(self.part_widgets) > 0:
@@ -235,6 +249,8 @@ class YoyoPartData:
 
     mmoiMatrix = [0,0,0] # only XX, YY, ZZ
 
+    centroid = 0.00 # only along x axis, for one half
+
     unitMass = 1.00 # gram
     unitLength = 1.00 # mm
     unitVolume = 1.00 # mm3
@@ -268,11 +284,24 @@ class YoyoPartData:
             # App.Console.PrintMessage("Couldn't read density from: '"+part.Label+"', skipping this part\n")
             return
 
+
+
         partVolume = part.Shape.Volume
         partMass = partVolume * partDensity / 1000.0
         partMMOI = self.addMOI(part, partDensity)
+        mx = abs(part.Shape.CenterOfMass[0]);
+        self.addCentroid(mx, partMass) # Part of centroid
         self.yoyoMass = self.yoyoMass + partMass
-        partData = { 'label': part.Label, 'mass': partMass, 'density': partDensity, 'volume': partVolume, 'mmoi': partMMOI }
+
+
+        # Combine all data and append to parts list
+        partData = { 'label': part.Label,
+                'mass': partMass,
+                'density': partDensity,
+                'volume': partVolume,
+                'mmoi': partMMOI,
+                'mx': mx,
+                }
         self.parts.append(partData)
 
         # App.Console.PrintMessage("\tDensity: "+self.formatString.format(partDensity)+"\n")
@@ -298,6 +327,10 @@ class YoyoPartData:
             ZMax = max(ZMax, box.ZMax)
         return (XMin, XMax, YMin, YMax, ZMin, ZMax)
 
+    def addCentroid(self, mx, partMass):
+        if partMass <= 0.0:
+            return
+        self.centroid = (self.centroid * self.yoyoMass + mx * partMass) / (self.yoyoMass + partMass);
 
     def addMOI(self, part, partDensity):
         myMajor = 0
@@ -318,7 +351,6 @@ class YoyoPartData:
             myMajor += Icm.A[0] * scale
 
         return myMajor
-
 
 
 
